@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#111827" />
+  <title>Bowflex Progress</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="icon.svg" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="app">
+    <header class="app-header">
+      <div>
+        <div class="eyebrow">Strength tracker</div>
+        <h1>Bowflex Progress</h1>
+      </div>
+      <button id="syncBadge" class="sync-badge" type="button" title="Data status">Local</button>
+    </header>
+
+    <main>
+      <section id="homeView" class="view active">
+        <div class="hero-card">
+          <div class="muted">Last workout</div>
+          <div id="lastWorkoutDate" class="hero-date">No workouts yet</div>
+          <div id="lastWorkoutSummary" class="hero-summary">Start your first session.</div>
+        </div>
+
+        <button id="startWorkoutBtn" class="primary big-btn" type="button">Today’s Exercises</button>
+        <button id="trendsBtn" class="secondary big-btn" type="button">Trends</button>
+
+        <div class="stats-grid">
+          <div class="stat-card">
+            <span>This week</span>
+            <strong id="weekCount">0</strong>
+            <small>workouts</small>
+          </div>
+          <div class="stat-card">
+            <span>Last 30 days</span>
+            <strong id="monthCount">0</strong>
+            <small>workouts</small>
+          </div>
+          <div class="stat-card">
+            <span>Current streak</span>
+            <strong id="streakCount">0</strong>
+            <small>weeks</small>
+          </div>
+        </div>
+      </section>
+
+      <section id="workoutView" class="view">
+        <div class="section-top">
+          <button class="back-btn" data-go="homeView" type="button">← Home</button>
+          <h2>Today’s Exercises</h2>
+        </div>
+
+        <label class="date-label">
+          Workout date
+          <input id="workoutDate" type="date" />
+        </label>
+
+        <div id="exerciseList" class="exercise-list"></div>
+
+        <label class="notes-card">
+          Workout notes
+          <textarea id="workoutNotes" rows="3" placeholder="Optional note about how the workout felt…"></textarea>
+        </label>
+
+        <button id="saveWorkoutBtn" class="primary big-btn sticky-save" type="button">Save Workout</button>
+      </section>
+
+      <section id="trendsView" class="view">
+        <div class="section-top">
+          <button class="back-btn" data-go="homeView" type="button">← Home</button>
+          <h2>Trends</h2>
+        </div>
+
+        <div class="panel">
+          <div class="calendar-head">
+            <button id="prevMonth" class="icon-btn" type="button">‹</button>
+            <strong id="calendarTitle"></strong>
+            <button id="nextMonth" class="icon-btn" type="button">›</button>
+          </div>
+          <div class="weekdays">
+            <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
+          </div>
+          <div id="calendarGrid" class="calendar-grid"></div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-title-row">
+            <div>
+              <div class="muted">Consistency</div>
+              <h3>Workouts per week</h3>
+            </div>
+          </div>
+          <canvas id="weeklyChart" height="220"></canvas>
+        </div>
+
+        <div class="panel">
+          <div class="panel-title-row">
+            <div>
+              <div class="muted">Strength progress</div>
+              <h3>Exercise weight</h3>
+            </div>
+          </div>
+
+          <select id="exerciseSelect" class="select"></select>
+
+          <div class="metric-row">
+            <div><span>Current</span><strong id="metricCurrent">—</strong></div>
+            <div><span>Starting</span><strong id="metricStart">—</strong></div>
+            <div><span>Change</span><strong id="metricChange">—</strong></div>
+            <div><span>Best</span><strong id="metricBest">—</strong></div>
+          </div>
+
+          <canvas id="weightChart" height="250"></canvas>
+        </div>
+
+        <div id="dayDetail" class="panel hidden"></div>
+      </section>
+    </main>
+
+    <div id="toast" class="toast" role="status"></div>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="app.js"></script>
+</body>
+</html>
