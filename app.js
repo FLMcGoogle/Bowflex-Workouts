@@ -55,39 +55,69 @@ async function initDataLayer() {
       config.supabaseAnonKey
     );
 
-    const { data } = await supabaseClient.auth.getSession();
+    // Check whether a Supabase session already exists
+    const { data, error } = await supabaseClient.auth.getSession();
+
+    if (error) {
+      console.error("Session check failed:", error);
+    }
 
     if (data?.session?.user) {
       currentUser = data.session.user;
       dbMode = "supabase";
-      await loadFromSupabase();
+
+      // Show Cloud immediately
+      updateSyncBadge();
+
+      // Then try to load cloud data
+      try {
+        await loadFromSupabase();
+      } catch (cloudError) {
+        console.error("Initial cloud load failed:", cloudError);
+        toast("Signed in, but cloud data could not load.");
+      }
+    } else {
+      currentUser = null;
+      dbMode = "local";
+      updateSyncBadge();
     }
 
-    supabaseClient.auth.onAuthStateChange(async (event, session) => {
+    // Watch for login/logout changes
+    supabaseClient.auth.onAuthStateChange((event, session) => {
       currentUser = session?.user || null;
 
       if (currentUser) {
         dbMode = "supabase";
-        await loadFromSupabase();
-        renderHome();
-        toast("Cloud sync active.");
+
+        // Immediately show Cloud
+        updateSyncBadge();
+
+        // Load cloud data separately
+        setTimeout(async () => {
+          try {
+            await loadFromSupabase();
+            renderHome();
+          } catch (cloudError) {
+            console.error("Cloud data load failed:", cloudError);
+            toast("Signed in, but cloud data could not load.");
+          }
+        }, 0);
+
       } else {
         dbMode = "local";
         loadLocal();
+        updateSyncBadge();
         renderHome();
       }
-
-      updateSyncBadge();
     });
 
   } catch (e) {
     console.warn("Supabase unavailable. Using local storage.", e);
+    currentUser = null;
     dbMode = "local";
+    updateSyncBadge();
   }
-
-  updateSyncBadge();
 }
-
 function loadLocal() {
   try {
     state = JSON.parse(localStorage.getItem(STORAGE_KEY)) || { workouts: [] };
@@ -102,9 +132,12 @@ function saveLocal() {
 }
 
 async function loadFromSupabase() {
-  const { data: userData } = await supabaseClient.auth.getUser();
-  const user = userData?.user;
-  if (!user) return loadLocal();
+  const user = currentUser;
+
+  if (!user) {
+    loadLocal();
+    return;
+  }
 
   const { data, error } = await supabaseClient
     .from("workouts")
@@ -112,7 +145,10 @@ async function loadFromSupabase() {
     .eq("user_id", user.id)
     .order("workout_date", { ascending: true });
 
-  if (error) throw error;
+  if (error) {
+    console.error("Cloud load failed:", error);
+    throw error;
+  }
 
   state.workouts = (data || []).map(w => ({
     id: w.id,
@@ -124,6 +160,7 @@ async function loadFromSupabase() {
       completed: !!i.completed
     }))
   }));
+
   saveLocal();
 }
 
