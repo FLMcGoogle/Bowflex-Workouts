@@ -16,6 +16,7 @@ const STORAGE_KEY = "bowflex-progress-v1";
 const config = window.BOWFLEX_CONFIG || {};
 let supabaseClient = null;
 let dbMode = "local";
+let currentUser = null;
 let state = { workouts: [] };
 let calendarCursor = new Date();
 
@@ -41,24 +42,49 @@ function startOfWeek(date) {
 }
 
 async function initDataLayer() {
-  if (config.supabaseUrl && config.supabaseAnonKey && window.supabase) {
-    try {
-      supabaseClient = window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey);
-      const { data: sessionData } = await supabaseClient.auth.getSession();
-      if (sessionData?.session) {
+  loadLocal();
+
+  if (!config.supabaseUrl || !config.supabaseAnonKey || !window.supabase) {
+    updateSyncBadge();
+    return;
+  }
+
+  try {
+    supabaseClient = window.supabase.createClient(
+      config.supabaseUrl,
+      config.supabaseAnonKey
+    );
+
+    const { data } = await supabaseClient.auth.getSession();
+
+    if (data?.session?.user) {
+      currentUser = data.session.user;
+      dbMode = "supabase";
+      await loadFromSupabase();
+    }
+
+    supabaseClient.auth.onAuthStateChange(async (event, session) => {
+      currentUser = session?.user || null;
+
+      if (currentUser) {
         dbMode = "supabase";
         await loadFromSupabase();
+        renderHome();
+        toast("Cloud sync active.");
       } else {
         dbMode = "local";
         loadLocal();
+        renderHome();
       }
-    } catch (e) {
-      console.warn("Supabase unavailable, using local storage.", e);
-      loadLocal();
-    }
-  } else {
-    loadLocal();
+
+      updateSyncBadge();
+    });
+
+  } catch (e) {
+    console.warn("Supabase unavailable. Using local storage.", e);
+    dbMode = "local";
   }
+
   updateSyncBadge();
 }
 
@@ -158,9 +184,59 @@ async function persistWorkout(workout) {
 }
 
 function updateSyncBadge() {
-  $("syncBadge").textContent = dbMode === "supabase" ? "Cloud" : "Local";
+  if (currentUser) {
+    $("syncBadge").textContent = "☁ Cloud";
+    $("syncBadge").title = currentUser.email || "Cloud sync active";
+  } else {
+    $("syncBadge").textContent = "Local";
+    $("syncBadge").title = "Tap to sign in and enable cloud sync";
+  }
 }
 
+async function showAuthDialog() {
+  if (!supabaseClient) {
+    toast("Supabase is not configured.");
+    return;
+  }
+
+  if (currentUser) {
+    const signOut = confirm(
+      `Signed in as ${currentUser.email}\n\nSign out of cloud sync?`
+    );
+
+    if (signOut) {
+      await supabaseClient.auth.signOut();
+      toast("Signed out. Using local storage.");
+    }
+
+    return;
+  }
+
+  const email = prompt(
+    "Enter your email address to receive a secure Bowflex Progress sign-in link:"
+  );
+
+  if (!email) return;
+
+  try {
+    const { error } = await supabaseClient.auth.signInWithOtp({
+      email: email.trim(),
+      options: {
+        emailRedirectTo: window.location.href.split("#")[0]
+      }
+    });
+
+    if (error) throw error;
+
+    alert(
+      "Check your email.\n\nSupabase sent you a secure sign-in link. Tap the link and you'll return to Bowflex Progress."
+    );
+
+  } catch (error) {
+    console.error(error);
+    alert("Couldn't send the magic link:\n\n" + error.message);
+  }
+}
 function showView(id) {
   document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
   $(id).classList.add("active");
@@ -540,7 +616,7 @@ function toast(msg) {
   clearTimeout(toast.timer);
   toast.timer = setTimeout(() => t.classList.remove("show"), 2200);
 }
-
+$("syncBadge").addEventListener("click", showAuthDialog);
 $("startWorkoutBtn").addEventListener("click", () => {
   renderWorkout(localDateISO());
   showView("workoutView");
