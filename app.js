@@ -201,7 +201,7 @@ async function showAuthDialog() {
 
   if (currentUser) {
     const signOut = confirm(
-      `Signed in as ${currentUser.email}\n\nSign out of cloud sync?`
+      `Cloud Sync Active\n\nSigned in as ${currentUser.email}\n\nSign out?`
     );
 
     if (signOut) {
@@ -212,29 +212,55 @@ async function showAuthDialog() {
     return;
   }
 
-  const email = prompt(
-    "Enter your email address to receive a secure Bowflex Progress sign-in link:"
-  );
-
+  const email = prompt("Enter your email address:");
   if (!email) return;
 
+  const password = prompt(
+    "Enter your Bowflex Progress password.\n\nIf you have not created one yet, choose a password now and then use Sign Up."
+  );
+  if (!password) return;
+
+  const action = prompt(
+    "Type:\n\nLOGIN\nif you already have an account\n\nor\n\nSIGNUP\nif this is your first password login."
+  );
+
+  if (!action) return;
+
   try {
-    const { error } = await supabaseClient.auth.signInWithOtp({
-      email: email.trim(),
-      options: {
-        emailRedirectTo: window.location.href.split("#")[0]
-      }
-    });
+    if (action.trim().toUpperCase() === "SIGNUP") {
+      const { data, error } = await supabaseClient.auth.signUp({
+        email: email.trim(),
+        password
+      });
 
-    if (error) throw error;
+      if (error) throw error;
 
-    alert(
-      "Check your email.\n\nSupabase sent you a secure sign-in link. Tap the link and you'll return to Bowflex Progress."
-    );
+      alert(
+        "Account created.\n\nIf Supabase requires email confirmation, check your email once. After confirmation, you can use your email and password on any device."
+      );
+
+    } else {
+      const { data, error } =
+        await supabaseClient.auth.signInWithPassword({
+          email: email.trim(),
+          password
+        });
+
+      if (error) throw error;
+
+      currentUser = data.user;
+      dbMode = "supabase";
+
+      await loadFromSupabase();
+      updateSyncBadge();
+      renderHome();
+
+      toast("Cloud sync active.");
+    }
 
   } catch (error) {
     console.error(error);
-    alert("Couldn't send the magic link:\n\n" + error.message);
+    alert("Sign-in error:\n\n" + error.message);
   }
 }
 function showView(id) {
